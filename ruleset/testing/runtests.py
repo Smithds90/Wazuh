@@ -317,3 +317,5 @@ if __name__ == "__main__":
 
     if error:
         sys.exit(1)
+    else:
+        sys.exit(1)
