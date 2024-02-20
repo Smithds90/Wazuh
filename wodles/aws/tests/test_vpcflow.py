@@ -15,6 +15,7 @@ import aws_utils as utils
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'buckets_s3'))
 import aws_bucket
 import vpcflow
+import constants
 
 VPC_SCHEMA_COUNT = 8
 
@@ -64,12 +65,12 @@ def test_aws_vpc_flow_bucket_load_information_from_file():
     expected_result[0]["end"] = datetime.utcfromtimestamp(int(expected_result[0]["end"])).strftime('%Y-%m-%dT%H:%M:%SZ')
 
     with patch('aws_bucket.AWSBucket.decompress_file', mock_open(read_data=data)):
-        assert instance.load_information_from_file(utils.TEST_LOG_KEY) == list(expected_result)
+        assert instance.load_information_from_file(constants.TEST_LOG_KEY) == list(expected_result)
 
 
-@pytest.mark.parametrize('access_key', [None, utils.TEST_ACCESS_KEY])
-@pytest.mark.parametrize('secret_key', [None, utils.TEST_SECRET_KEY])
-@pytest.mark.parametrize('profile', [None, utils.TEST_AWS_PROFILE])
+@pytest.mark.parametrize('access_key', [None, constants.TEST_ACCESS_KEY])
+@pytest.mark.parametrize('secret_key', [None, constants.TEST_SECRET_KEY])
+@pytest.mark.parametrize('profile', [None, constants.TEST_AWS_PROFILE])
 def test_aws_vpc_flow_bucket_get_ec2_client(access_key: str or None, secret_key: str or None, profile: str or None):
     """Test 'get_ec2_client' method instantiates a boto3.Session object with the proper arguments.
 
@@ -83,7 +84,7 @@ def test_aws_vpc_flow_bucket_get_ec2_client(access_key: str or None, secret_key:
         AWS profile.
     """
     instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket)
-    region = utils.TEST_REGION
+    region = constants.TEST_REGION
 
     conn_args = {'region_name': region}
 
@@ -106,8 +107,8 @@ def test_aws_vpc_flow_bucket_get_ec2_client_handles_exceptions_on_ec2_client_err
 
     with patch('boto3.Session'), \
             pytest.raises(SystemExit) as e:
-        instance.get_ec2_client(utils.TEST_ACCESS_KEY, utils.TEST_SECRET_KEY, utils.TEST_REGION, utils.TEST_AWS_PROFILE)
-    assert e.value.code == utils.INVALID_CREDENTIALS_ERROR_CODE
+        instance.get_ec2_client(constants.TEST_ACCESS_KEY, constants.TEST_SECRET_KEY, constants.TEST_REGION, constants.TEST_AWS_PROFILE)
+    assert e.value.code == constants.INVALID_CREDENTIALS_ERROR_CODE
 
 
 @patch('vpcflow.AWSVPCFlowBucket.get_ec2_client')
@@ -134,14 +135,14 @@ def test_aws_vpc_flow_bucket_get_flow_logs_ids(mock_get_ec2_client):
         'NextToken': 'string'
     }
 
-    assert ['Id1', 'Id2', 'Id3'] == instance.get_flow_logs_ids(utils.TEST_ACCESS_KEY, utils.TEST_SECRET_KEY,
-                                                               utils.TEST_REGION, utils.TEST_AWS_PROFILE)
+    assert ['Id1', 'Id2', 'Id3'] == instance.get_flow_logs_ids(constants.TEST_ACCESS_KEY, constants.TEST_SECRET_KEY,
+                                                               constants.TEST_REGION, constants.TEST_AWS_PROFILE)
 
 
 @pytest.mark.parametrize('log_file, account_id, region, expected_result', [
-    (TEST_LOG_KEY, utils.TEST_ACCOUNT_ID, utils.TEST_REGION, True),
-    ("", utils.TEST_ACCOUNT_ID, utils.TEST_REGION, False),
-    (TEST_LOG_KEY, "", utils.TEST_REGION, False),
+    (TEST_LOG_KEY, constants.TEST_ACCOUNT_ID, constants.TEST_REGION, True),
+    ("", constants.TEST_ACCOUNT_ID, constants.TEST_REGION, False),
+    (TEST_LOG_KEY, "", constants.TEST_REGION, False),
 ])
 def test_aws_vpc_flow_bucket_already_processed(custom_database,
                                                log_file: str, account_id: str,
@@ -161,23 +162,23 @@ def test_aws_vpc_flow_bucket_already_processed(custom_database,
     """
     utils.database_execute_script(custom_database, TEST_VPCFLOW_SCHEMA)
 
-    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=utils.TEST_BUCKET)
+    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=constants.TEST_BUCKET)
     instance.db_connector = custom_database
     instance.db_cursor = instance.db_connector.cursor()
     instance.db_table_name = TEST_TABLE_NAME
-    instance.aws_account_id = utils.TEST_ACCOUNT_ID
+    instance.aws_account_id = constants.TEST_ACCOUNT_ID
 
     assert instance.already_processed(downloaded_file=log_file, aws_account_id=account_id,
                                       aws_region=region, flow_log_id=TEST_FLOW_LOG_ID) == expected_result
 
 
-@pytest.mark.parametrize('account_id', [[utils.TEST_ACCOUNT_ID], None])
-@pytest.mark.parametrize('regions', [[utils.TEST_REGION], None])
+@pytest.mark.parametrize('account_id', [[constants.TEST_ACCOUNT_ID], None])
+@pytest.mark.parametrize('regions', [[constants.TEST_REGION], None])
 @patch('aws_bucket.AWSLogsBucket.iter_files_in_bucket')
 @patch('vpcflow.AWSVPCFlowBucket.get_flow_logs_ids', return_value=['Id1'])
 @patch('vpcflow.AWSVPCFlowBucket.db_maintenance')
-@patch('aws_bucket.AWSBucket.find_account_ids', return_value=[utils.TEST_ACCOUNT_ID])
-@patch('aws_bucket.AWSBucket.find_regions', side_effect=[[utils.TEST_REGION], None])
+@patch('aws_bucket.AWSBucket.find_account_ids', return_value=[constants.TEST_ACCOUNT_ID])
+@patch('aws_bucket.AWSBucket.find_regions', side_effect=[[constants.TEST_REGION], None])
 def test_aws_vpc_flow_bucket_iter_regions_and_accounts(mock_find_regions, mock_accounts,
                                                        mock_maintenance, mock_get_flow_logs_ids,
                                                        mock_iter_files_in_bucket,
@@ -193,9 +194,9 @@ def test_aws_vpc_flow_bucket_iter_regions_and_accounts(mock_find_regions, mock_a
     """
     instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket)
 
-    instance.access_key = utils.TEST_ACCESS_KEY
-    instance.secret_key = utils.TEST_SECRET_KEY
-    instance.profile_name = utils.TEST_AWS_PROFILE
+    instance.access_key = constants.TEST_ACCESS_KEY
+    instance.secret_key = constants.TEST_SECRET_KEY
+    instance.profile_name = constants.TEST_AWS_PROFILE
 
     instance.iter_regions_and_accounts(account_id, regions)
 
@@ -219,7 +220,7 @@ def test_aws_vpc_flow_bucket_iter_regions_and_accounts(mock_find_regions, mock_a
 
 
 @pytest.mark.parametrize('flow_log_id', [TEST_FLOW_LOG_ID, "other-id"])
-@pytest.mark.parametrize('region', [utils.TEST_REGION, "invalid_region"])
+@pytest.mark.parametrize('region', [constants.TEST_REGION, "invalid_region"])
 def test_aws_vpc_flow_bucket_db_count_region(custom_database, region: str, flow_log_id: str):
     """Test 'db_count_region' method returns the number of rows in DB for a region.
 
@@ -231,33 +232,33 @@ def test_aws_vpc_flow_bucket_db_count_region(custom_database, region: str, flow_
         Flow log ID.
     """
     utils.database_execute_script(custom_database, TEST_VPCFLOW_SCHEMA)
-    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=utils.TEST_BUCKET)
+    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=constants.TEST_BUCKET)
     instance.db_connector = custom_database
     instance.db_cursor = instance.db_connector.cursor()
     instance.db_table_name = TEST_TABLE_NAME
 
-    expected_count = VPC_SCHEMA_COUNT if region == utils.TEST_REGION and flow_log_id == TEST_FLOW_LOG_ID else 0
-    assert instance.db_count_region(utils.TEST_ACCOUNT_ID, region, flow_log_id) == expected_count
+    expected_count = VPC_SCHEMA_COUNT if region == constants.TEST_REGION and flow_log_id == TEST_FLOW_LOG_ID else 0
+    assert instance.db_count_region(constants.TEST_ACCOUNT_ID, region, flow_log_id) == expected_count
 
 
 @pytest.mark.parametrize('expected_db_count', [VPC_SCHEMA_COUNT, 0])
 def test_aws_vpc_flow_bucket_db_maintenance(custom_database, expected_db_count: int):
     """Test 'db_maintenance' function deletes rows from a table until the count is equal to 'retain_db_records'."""
     utils.database_execute_script(custom_database, TEST_VPCFLOW_SCHEMA)
-    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=utils.TEST_BUCKET)
+    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=constants.TEST_BUCKET)
     instance.db_connector = custom_database
     instance.db_cursor = instance.db_connector.cursor()
     instance.db_table_name = TEST_TABLE_NAME
     instance.retain_db_records = expected_db_count
 
-    assert utils.database_execute_query(instance.db_connector, utils.SQL_COUNT_ROWS.format(
+    assert utils.database_execute_query(instance.db_connector, constants.SQL_COUNT_ROWS.format(
         table_name=instance.db_table_name)) == VPC_SCHEMA_COUNT
 
     with patch('aws_bucket.AWSBucket.db_count_region', return_value=VPC_SCHEMA_COUNT):
-        instance.db_maintenance(aws_account_id=utils.TEST_ACCOUNT_ID, aws_region=utils.TEST_REGION,
+        instance.db_maintenance(aws_account_id=constants.TEST_ACCOUNT_ID, aws_region=constants.TEST_REGION,
                                 flow_log_id=TEST_FLOW_LOG_ID)
 
-    assert utils.database_execute_query(instance.db_connector, utils.SQL_COUNT_ROWS.format(
+    assert utils.database_execute_query(instance.db_connector, constants.SQL_COUNT_ROWS.format(
         table_name=instance.db_table_name)) == expected_db_count
 
 
@@ -265,12 +266,12 @@ def test_aws_vpc_flow_bucket_mark_complete(custom_database):
     """Test 'mark_complete' method inserts non-processed logs into the DB."""
     utils.database_execute_script(custom_database, TEST_EMPTY_TABLE_SCHEMA)
 
-    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=utils.TEST_BUCKET)
+    instance = utils.get_mocked_bucket(class_=vpcflow.AWSVPCFlowBucket, bucket=constants.TEST_BUCKET)
 
     instance.reparse = True
     with patch('vpcflow.AWSVPCFlowBucket.already_processed', return_value=True), \
             patch('aws_bucket.aws_tools.debug') as mock_debug:
-        instance.mark_complete(aws_account_id=utils.TEST_ACCOUNT_ID, aws_region=utils.TEST_REGION,
+        instance.mark_complete(aws_account_id=constants.TEST_ACCOUNT_ID, aws_region=constants.TEST_REGION,
                                log_file={'Key': TEST_LOG_KEY}, flow_log_id=TEST_FLOW_LOG_ID)
         mock_debug.assert_called_once_with(f'+++ File already marked complete, but reparse flag set: {TEST_LOG_KEY}', 2)
 
@@ -283,18 +284,18 @@ def test_aws_vpc_flow_bucket_mark_complete(custom_database):
     instance.db_table_name = TEST_TABLE_NAME
 
     assert utils.database_execute_query(instance.db_connector,
-                                        utils.SQL_COUNT_ROWS.format(table_name=instance.db_table_name)) == 0
+                                        constants.SQL_COUNT_ROWS.format(table_name=instance.db_table_name)) == 0
 
-    instance.mark_complete(aws_account_id=utils.TEST_ACCOUNT_ID, aws_region=utils.TEST_REGION,
+    instance.mark_complete(aws_account_id=constants.TEST_ACCOUNT_ID, aws_region=constants.TEST_REGION,
                            log_file=log_file, flow_log_id=TEST_FLOW_LOG_ID)
 
     assert utils.database_execute_query(instance.db_connector,
-                                        utils.SQL_COUNT_ROWS.format(table_name=instance.db_table_name)) == 1
+                                        constants.SQL_COUNT_ROWS.format(table_name=instance.db_table_name)) == 1
 
     row = utils.database_execute_query(instance.db_connector, SQL_GET_ROW.format(table_name=instance.db_table_name))
-    assert row[0] == f"{utils.TEST_BUCKET}/"
-    assert row[1] == utils.TEST_ACCOUNT_ID
-    assert row[2] == utils.TEST_REGION
+    assert row[0] == f"{constants.TEST_BUCKET}/"
+    assert row[1] == constants.TEST_ACCOUNT_ID
+    assert row[2] == constants.TEST_REGION
     assert row[3] == TEST_FLOW_LOG_ID
     assert row[4] == TEST_LOG_KEY
     assert row[5] == instance.get_creation_date(log_file)
@@ -310,7 +311,7 @@ def test_aws_vpc_flow_bucket_mark_complete_handles_exceptions_on_query_error(moc
     mocked_cursor.execute.side_effect = Exception
     instance.db_cursor = mocked_cursor
 
-    instance.mark_complete(aws_account_id=utils.TEST_ACCOUNT_ID, aws_region=utils.TEST_REGION,
+    instance.mark_complete(aws_account_id=constants.TEST_ACCOUNT_ID, aws_region=constants.TEST_REGION,
                            log_file={'Key': TEST_LOG_KEY}, flow_log_id=TEST_FLOW_LOG_ID)
 
     mock_debug.assert_any_call(f"+++ Error marking log {TEST_LOG_KEY} as completed: ", 2)

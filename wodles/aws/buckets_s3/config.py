@@ -4,11 +4,11 @@
 
 import sys
 import re
-from os import path
 from datetime import datetime
 from time import mktime
 
 import aws_bucket
+import constants
 
 
 class AWSConfigBucket(aws_bucket.AWSLogsBucket):
@@ -52,7 +52,7 @@ class AWSConfigBucket(aws_bucket.AWSLogsBucket):
         str
             Date with the format used by the database.
         """
-        return datetime.strftime(datetime.strptime(date, self.date_format), aws_bucket.DB_DATE_FORMAT)
+        return datetime.strftime(datetime.strptime(date, self.date_format), constants.AWS_BUCKET_DB_DATE_FORMAT)
 
     def _remove_padding_zeros_from_marker(self, marker: str) -> str:
         """Remove the leading zeros from the month and day of a given marker.

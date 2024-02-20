@@ -14,6 +14,9 @@ sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 
 import aws_bucket
 import load_balancers
 
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+import constants
+
 
 @patch('aws_bucket.AWSCustomBucket.__init__')
 def test_aws_lb_bucket_initializes_properly(mock_custom_bucket):
@@ -26,9 +29,9 @@ def test_aws_lb_bucket_initializes_properly(mock_custom_bucket):
 @patch('wazuh_integration.WazuhIntegration.get_sts_client')
 def test_aws_lb_bucket_get_base_prefix(mock_sts):
     """Test 'get_base_prefix' returns the expected prefix with the format <prefix>/AWSLogs/<suffix>"""
-    instance = utils.get_mocked_bucket(class_=load_balancers.AWSLBBucket, prefix=f'{utils.TEST_PREFIX}/',
-                                       suffix=f'{utils.TEST_SUFFIX}/')
-    expected_base_prefix = os.path.join(utils.TEST_PREFIX, 'AWSLogs', utils.TEST_SUFFIX, '')
+    instance = utils.get_mocked_bucket(class_=load_balancers.AWSLBBucket, prefix=f'{constants.TEST_PREFIX}/',
+                                       suffix=f'{constants.TEST_SUFFIX}/')
+    expected_base_prefix = os.path.join(constants.TEST_PREFIX, 'AWSLogs', constants.TEST_SUFFIX, '')
     assert instance.get_base_prefix() == expected_base_prefix
 
 
@@ -37,8 +40,8 @@ def test_aws_lb_bucket_get_base_prefix(mock_sts):
 def test_aws_lb_bucket_get_service_prefix(mock_custom_bucket, mock_base_prefix):
     """Test 'get_service_prefix' returns the expected prefix with the format <base_prefix>/<account_id>/<service>."""
     instance = utils.get_mocked_bucket(class_=load_balancers.AWSLBBucket)
-    expected_service_prefix = os.path.join('base_prefix', utils.TEST_ACCOUNT_ID, instance.service, '')
-    assert instance.get_service_prefix(utils.TEST_ACCOUNT_ID) == expected_service_prefix
+    expected_service_prefix = os.path.join('base_prefix', constants.TEST_ACCOUNT_ID, instance.service, '')
+    assert instance.get_service_prefix(constants.TEST_ACCOUNT_ID) == expected_service_prefix
 
 
 @patch('aws_bucket.AWSBucket.iter_regions_and_accounts')
@@ -46,20 +49,20 @@ def test_aws_lb_bucket_get_service_prefix(mock_custom_bucket, mock_base_prefix):
 def test_aws_lb_bucket_iter_regions_and_accounts(mock_custom_bucket, mock_iter_regions_accounts):
     """Test 'iter_regions_and_accounts' method calls AWSBucket.iter_regions_and_accounts"""
     instance = utils.get_mocked_bucket(class_=load_balancers.AWSLBBucket)
-    instance.iter_regions_and_accounts(utils.TEST_ACCOUNT_ID, utils.TEST_REGION)
+    instance.iter_regions_and_accounts(constants.TEST_ACCOUNT_ID, constants.TEST_REGION)
 
-    mock_iter_regions_accounts.assert_called_with(instance, utils.TEST_ACCOUNT_ID, utils.TEST_REGION)
+    mock_iter_regions_accounts.assert_called_with(instance, constants.TEST_ACCOUNT_ID, constants.TEST_REGION)
 
 
 @patch('load_balancers.AWSLBBucket.get_service_prefix',
-       return_value=os.path.join('base_prefix', utils.TEST_ACCOUNT_ID, 'elasticloadbalancing', ''))
+       return_value=os.path.join('base_prefix', constants.TEST_ACCOUNT_ID, 'elasticloadbalancing', ''))
 @patch('aws_bucket.AWSCustomBucket.__init__')
 def test_aws_lb_bucket_get_full_prefix(mock_custom_bucket, mock_service_prefix):
     """Test 'get_full_prefix' returns the expected prefix with the format <service_prefix>/<region>."""
     instance = utils.get_mocked_bucket(class_=load_balancers.AWSLBBucket)
-    expected_full_prefix = os.path.join('base_prefix', utils.TEST_ACCOUNT_ID, 'elasticloadbalancing',
-                                        utils.TEST_REGION, '')
-    assert instance.get_full_prefix(utils.TEST_ACCOUNT_ID, utils.TEST_REGION) == expected_full_prefix
+    expected_full_prefix = os.path.join('base_prefix', constants.TEST_ACCOUNT_ID, 'elasticloadbalancing',
+                                        constants.TEST_REGION, '')
+    assert instance.get_full_prefix(constants.TEST_ACCOUNT_ID, constants.TEST_REGION) == expected_full_prefix
 
 
 @patch('aws_bucket.AWSBucket.mark_complete')
@@ -69,9 +72,9 @@ def test_aws_lb_bucket_mark_complete(mock_custom_bucket, mock_mark_complete):
     test_log_file = 'log_file'
 
     instance = utils.get_mocked_bucket(class_=load_balancers.AWSLBBucket)
-    instance.mark_complete(utils.TEST_ACCOUNT_ID, utils.TEST_REGION, test_log_file)
+    instance.mark_complete(constants.TEST_ACCOUNT_ID, constants.TEST_REGION, test_log_file)
 
-    mock_mark_complete.assert_called_with(instance, utils.TEST_ACCOUNT_ID, utils.TEST_REGION, test_log_file)
+    mock_mark_complete.assert_called_with(instance, constants.TEST_ACCOUNT_ID, constants.TEST_REGION, test_log_file)
 
 
 @patch('load_balancers.AWSLBBucket.__init__')
@@ -128,11 +131,11 @@ def test_aws_alb_bucket_load_information_from_file(mock_sts_client):
             'target_port_list': '80', 'target_status_code_list': '403',
             "source": "alb", 'classification': '-', 'classification_reason': '-'
         }]
-        assert expected_information == instance.load_information_from_file(utils.TEST_LOG_KEY)
+        assert expected_information == instance.load_information_from_file(constants.TEST_LOG_KEY)
 
         # Force Error when handling IP:Port fields
         tsv_reader[0]['client_port'] = '0.0.0.0'
-        instance.load_information_from_file(utils.TEST_LOG_KEY)
+        instance.load_information_from_file(constants.TEST_LOG_KEY)
         mock_debug.assert_called()
 
 
@@ -171,7 +174,7 @@ def test_aws_clb_bucket_load_information_from_file(mock_sts_client):
             "ssl_protocol": "-", "source": "clb"
         }]
 
-        assert expected_information == instance.load_information_from_file(utils.TEST_LOG_KEY)
+        assert expected_information == instance.load_information_from_file(constants.TEST_LOG_KEY)
 
 
 @patch('load_balancers.AWSLBBucket.__init__')
@@ -214,11 +217,11 @@ def test_aws_nlb_bucket_load_information_from_file(mock_sts_client):
             "null": "-", "source": "nlb", "client_ip": "0.0.0.0", "destination_ip": "0.0.0.0"
         }]
 
-        assert expected_information == instance.load_information_from_file(utils.TEST_LOG_KEY)
+        assert expected_information == instance.load_information_from_file(constants.TEST_LOG_KEY)
 
         # Force Error when handling IP:Port fields
         tsv_reader[0]['client_port'] = '0.0.0.0'
         tsv_reader[0]['destination_port'] = '0.0.0.0'
-        result = instance.load_information_from_file(utils.TEST_LOG_KEY)
+        result = instance.load_information_from_file(constants.TEST_LOG_KEY)
         assert result[0]['client_ip'] == tsv_reader[0]['client_port']
         assert result[0]['destination_ip'] == tsv_reader[0]['destination_port']

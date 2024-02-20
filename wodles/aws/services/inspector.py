@@ -11,6 +11,7 @@ import aws_service
 
 sys.path.insert(0, path.dirname(path.dirname(path.abspath(__file__))))
 import aws_tools
+import constants
 
 
 SUPPORTED_REGIONS = (
@@ -49,7 +50,7 @@ class AWSInspector(aws_service.AWSService):
                  remove_log_streams=None, discard_field=None, discard_regex=None,
                  sts_endpoint=None, service_endpoint=None, iam_role_duration=None, **kwargs):
 
-        aws_service.AWSService.__init__(self, db_table_name=aws_service.DEFAULT_TABLENAME, service_name='inspector',
+        aws_service.AWSService.__init__(self, db_table_name=constants.DEFAULT_AWS_SERVICE_TABLENAME, service_name='inspector',
                                         reparse=reparse, access_key=access_key, secret_key=secret_key,
                                         profile=profile, iam_role_arn=iam_role_arn, only_logs_after=only_logs_after,
                                         region=region, aws_log_groups=aws_log_groups,

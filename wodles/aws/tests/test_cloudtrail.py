@@ -11,8 +11,10 @@ sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '.'))
 import aws_utils as utils
 
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'buckets_s3'))
-import aws_bucket
 import cloudtrail
+
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+import constants
 
 
 @patch('aws_bucket.AWSLogsBucket.__init__')
@@ -27,9 +29,9 @@ def test_aws_cloudtrail_bucket_initializes_properly(mock_logs_bucket):
 @patch('aws_bucket.AWSBucket.reformat_msg')
 def test_aws_cloudtrail_bucket_reformat_msg(mock_reformat):
     """Test 'reformat_msg' method applies the expected format to a given event."""
-    event = copy.deepcopy(aws_bucket.AWS_BUCKET_MSG_TEMPLATE)
+    event = copy.deepcopy(constants.AWS_BUCKET_MSG_TEMPLATE)
     # Add problematic fields
-    for field in cloudtrail.DYNAMIC_FIELDS:
+    for field in constants.AWS_CLOUDTRAIL_DYNAMIC_FIELDS:
         if field == 'requestParameters':
             event['aws'].update({field: {'disableApiTermination': False}})
         else:
@@ -39,7 +41,7 @@ def test_aws_cloudtrail_bucket_reformat_msg(mock_reformat):
     formatted_event = instance.reformat_msg(event)
     mock_reformat.assert_called_with(instance, event)
 
-    for field in cloudtrail.DYNAMIC_FIELDS:
+    for field in constants.AWS_CLOUDTRAIL_DYNAMIC_FIELDS:
         if field == 'requestParameters':
             # Check disableApiTermination field was cast from bool to dict
             assert isinstance(formatted_event['aws']['requestParameters']['disableApiTermination'], dict)

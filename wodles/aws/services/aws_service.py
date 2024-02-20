@@ -11,10 +11,7 @@ sys.path.insert(0, path.dirname(path.dirname(path.abspath(__file__))))
 import wazuh_integration
 
 sys.path.insert(0, path.dirname(path.dirname(path.abspath(__file__))))
-import aws_tools
-
-DEFAULT_DATABASE_NAME = "aws_services"
-DEFAULT_TABLENAME = "aws_services"
+import constants
 
 AWS_SERVICE_MSG_TEMPLATE = {'integration': 'aws', 'aws': ''}
 
@@ -58,7 +55,7 @@ class AWSService(wazuh_integration.WazuhAWSDatabase):
     """
 
     def __init__(self, reparse: bool, access_key: str, secret_key: str, profile: str, iam_role_arn: str,
-                 service_name: str, only_logs_after: str, region: str, db_table_name: str = DEFAULT_TABLENAME,
+                 service_name: str, only_logs_after: str, region: str, db_table_name: str = constants.DEFAULT_AWS_SERVICE_TABLENAME,
                  discard_field: str = None, discard_regex: str = None, sts_endpoint: str = None,
                  service_endpoint: str = None,
                  iam_role_duration: str = None, **kwargs):
@@ -137,13 +134,13 @@ class AWSService(wazuh_integration.WazuhAWSDatabase):
     def check_region(region: str) -> None:
         """
         Check if the region is valid.
-        
+
         Parameters
         ----------
         region : str
             AWS region.
         """
-        if region not in aws_tools.ALL_REGIONS:
+        if region not in constants.ALL_REGIONS:
             raise ValueError(f"Invalid region '{region}'")
 
     def get_last_log_date(self):

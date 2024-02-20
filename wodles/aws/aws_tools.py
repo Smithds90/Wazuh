@@ -9,29 +9,12 @@
 
 import argparse
 import configparser
-from os import path
 from datetime import datetime
 from typing import Optional
 import sys
 import re
 
-DEFAULT_AWS_CONFIG_PATH = path.join(path.expanduser('~'), '.aws', 'config')
-CREDENTIALS_URL = 'https://documentation.wazuh.com/current/amazon/services/prerequisites/credentials.html'
-DEPRECATED_MESSAGE = 'The {name} authentication parameter was deprecated in {release}. ' \
-                     'Please use another authentication method instead. Check {url} for more information.'
-SECURITY_LAKE_IAM_ROLE_AUTHENTICATION_URL = 'https://documentation.wazuh.com/current/cloud-security/amazon/services/' \
-                                        'supported-services/security-lake.html#configuring-an-iam-role'
-
-ALL_REGIONS = (
-    'af-south-1', 'ap-east-1', 'ap-northeast-1', 'ap-northeast-2', 'ap-northeast-3', 'ap-south-1', 'ap-south-2',
-    'ap-southeast-1', 'ap-southeast-2', 'ap-southeast-3', 'ap-southeast-4', 'ca-central-1', 'eu-central-1',
-    'eu-central-2', 'eu-north-1', 'eu-south-1', 'eu-south-2', 'eu-west-1', 'eu-west-2', 'eu-west-3', 'il-central-1',
-    'me-central-1', 'me-south-1', 'sa-east-1', 'us-east-1', 'us-east-2', 'us-west-1', 'us-west-2'
-)
-
-RETRY_ATTEMPTS_KEY: str = "max_attempts"
-RETRY_MODE_CONFIG_KEY: str = "retry_mode"
-RETRY_MODE_BOTO_KEY: str = "mode"
+import constants
 
 # Enable/disable debug mode
 debug_level = 0
@@ -316,7 +299,7 @@ def get_aws_config_params() -> configparser.RawConfigParser:
         The parsed configuration.
     """
     config = configparser.RawConfigParser()
-    config.read(DEFAULT_AWS_CONFIG_PATH)
+    config.read(constants.DEFAULT_AWS_CONFIG_PATH)
 
     return config
 
@@ -343,10 +326,10 @@ def get_script_arguments():
     parser.add_argument('-d', '--debug', action='store', dest='debug', default=0, help='Enable debug')
     parser.add_argument('-a', '--access_key', dest='access_key', default=None,
                         help='S3 Access key credential. '
-                             f'{DEPRECATED_MESSAGE.format(name="access_key", release="4.4", url=CREDENTIALS_URL)}')
+                             f'{constants.AWS_AUTH_DEPRECATED_MESSAGE.format(name="access_key", release="4.4", url=constants.AWS_CREDENTIALS_URL)}')
     parser.add_argument('-k', '--secret_key', dest='secret_key', default=None,
                         help='S3 Access key credential. '
-                             f'{DEPRECATED_MESSAGE.format(name="secret_key", release="4.4", url=CREDENTIALS_URL)}')
+                             f'{constants.AWS_AUTH_DEPRECATED_MESSAGE.format(name="secret_key", release="4.4", url=constants.AWS_CREDENTIALS_URL)}')
     # Beware, once you delete history it's gone.
     parser.add_argument('-R', '--remove', action='store_true', dest='deleteFile',
                         help='Remove processed files from the AWS S3 bucket', default=False)
