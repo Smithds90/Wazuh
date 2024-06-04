@@ -5,7 +5,6 @@
 # This program is free software; you can redistribute
 # it and/or modify it under the terms of GPLv2
 
-import logging
 import sys
 from hashlib import md5
 from json import dumps
@@ -27,6 +26,12 @@ from azure_utils import (
 )
 from db import orm
 from db.utils import create_new_row, update_row_object
+from shared.wazuh_cloud_logger import WazuhCloudLogger
+
+# Set Azure logger
+azure_logger = WazuhCloudLogger(
+    logger_name=':azure_wodle:'
+)
 
 URL_GRAPH = 'https://graph.microsoft.com'
 
@@ -34,17 +39,16 @@ URL_GRAPH = 'https://graph.microsoft.com'
 def start_graph(args):
     """Run the Microsoft Graph integration processing the logs available for the given query and offset values in
     the configuration. The client or application must have permission to access Microsoft Graph."""
-    logging.info('Azure Graph starting.')
+    azure_logger.info('Azure Graph starting.')
 
     # Read credentials
     if args.graph_auth_path and args.graph_tenant_domain:
-        logging.debug(f"Graph: Using the auth file {args.graph_auth_path} for authentication")
+        azure_logger.debug(f"Graph: Using the auth file {args.graph_auth_path} for authentication")
         client, secret = read_auth_file(
             auth_path=args.graph_auth_path, fields=('application_id', 'application_key')
         )
     elif args.graph_id and args.graph_key and args.graph_tenant_domain:
-        logging.debug(f"Graph: Using id and key from configuration for authentication")
-        logging.warning(
+        azure_logger.warning(
             DEPRECATED_MESSAGE.format(
                 name='graph_id and graph_key', release='4.4', url=CREDENTIALS_URL
             )
@@ -52,11 +56,11 @@ def start_graph(args):
         client = args.graph_id
         secret = args.graph_key
     else:
-        logging.error('Graph: No parameters have been provided for authentication.')
+        azure_logger.error('Graph: No parameters have been provided for authentication.')
         sys.exit(1)
 
     # Get the token
-    logging.info('Graph: Getting authentication token.')
+    azure_logger.info('Graph: Getting authentication token.')
     token = get_token(
         client_id=client,
         secret=secret,
@@ -66,7 +70,7 @@ def start_graph(args):
     headers = {'Authorization': f'Bearer {token}'}
 
     # Build the query
-    logging.info('Graph: Building the url.')
+    azure_logger.info('Graph: Building the url.')
     md5_hash = md5(args.graph_query.encode()).hexdigest()
     url = build_graph_url(
         query=args.graph_query,
@@ -74,10 +78,10 @@ def start_graph(args):
         reparse=args.reparse,
         md5_hash=md5_hash,
     )
-    logging.info(f'Graph: The URL is "{url}"')
+    azure_logger.info(f'Graph: The URL is "{url}"')
 
     # Get events
-    logging.info('Graph: Pagination starts')
+    azure_logger.info('Graph: Pagination starts')
     try:
         get_graph_events(
             url=url,
@@ -87,8 +91,8 @@ def start_graph(args):
             tag=args.graph_tag,
         )
     except HTTPError as e:
-        logging.error(f'Graph: {e}')
-    logging.info('Graph: End')
+        azure_logger.error(f'Graph: {e}')
+    azure_logger.info('Graph: End')
 
 
 def build_graph_url(query: str, offset: str, reparse: bool, md5_hash: str):
@@ -116,7 +120,7 @@ def build_graph_url(query: str, offset: str, reparse: bool, md5_hash: str):
                 offset=offset,
             )
     except orm.AzureORMError as e:
-        logging.error(
+        azure_logger.error(
             f'Error trying to obtain row object from "{orm.Graph.__tablename__}" using md5="{md5}": {e}'
         )
         sys.exit(1)
@@ -137,20 +141,20 @@ def build_graph_url(query: str, offset: str, reparse: bool, md5_hash: str):
     # Build the filter taking into account the min and max values from the file
     else:
         if desired_datetime < min_datetime:
-            logging.debug(f"Graph: Making request query for the following intervals: "
+            azure_logger.debug(f"Graph: Making request query for the following intervals: "
                           f"from {desired_str} to {min_str} and from {max_str}")
             filter_value = (
                 f'({filtering_condition}+lt+{min_str}+and+{filtering_condition}+ge+{desired_str})'
                 f'+or+({filtering_condition}+gt+{max_str})'
             )
         elif desired_datetime > max_datetime:
-            logging.debug(f"Graph: Making request for the following interval: from {desired_str}")
+            azure_logger.debug(f"Graph: Making request for the following interval: from {desired_str}")
             filter_value = f'{filtering_condition}+ge+{desired_str}'
         else:
-            logging.debug(f"Graph: Making request for the following interval: from {max_str}")
+            azure_logger.debug(f"Graph: Making request for the following interval: from {max_str}")
             filter_value = f'{filtering_condition}+gt+{max_str}'
 
-    logging.debug(f'Graph: The search starts for query: "{query}" using {filter_value}')
+    azure_logger.info(f'Graph: The search starts for query: "{query}" using {filter_value}')
     return f'{URL_GRAPH}/v1.0/{query}{"?" if "?" not in query else ""}&$filter={filter_value}'
 
 
@@ -172,8 +176,8 @@ def get_graph_events(url: str, headers: dict, md5_hash: str, query: str, tag: st
         If the response for the request is not 200 OK.
     """
 
-    logging.debug(f"Graph request - URL: {url} - Headers: {headers}")
-    logging.info("Graph: Requesting data")
+    azure_logger.debug(f"Graph request - URL: {url} - Headers: {headers}")
+    azure_logger.info("Graph: Requesting data")
     response = get(url=url, headers=headers)
 
     if response.status_code == 200:
@@ -195,24 +199,24 @@ def get_graph_events(url: str, headers: dict, md5_hash: str, query: str, tag: st
             if tag:
                 value['azure_aad_tag'] = tag
             json_result = dumps(value)
-            logging.info('Graph: Sending event by socket.')
+            azure_logger.info('Graph: Sending event by socket.')
             send_message(json_result)
 
         if len(values_json) == 0:
-            logging.info('Graph: There are no new results')
+            azure_logger.info('Graph: There are no new results')
         next_url = response_json.get('@odata.nextLink')
 
         if next_url:
-            logging.info(f"Graph: Requesting data from next page")
-            logging.debug(f"Iterating to next url: {next_url}")
+            azure_logger.info(f"Graph: Requesting data from next page")
+            azure_logger.debug(f"Iterating to next url: {next_url}")
             get_graph_events(
                 url=next_url, headers=headers, md5_hash=md5_hash, query=query, tag=tag
             )
     elif response.status_code == 400:
-        logging.error(f'Bad Request for url: {response.url}')
-        logging.error(
+        azure_logger.error(f'Bad Request for url: {response.url}')
+        azure_logger.error(
             f'Ensure the URL is valid and there is data available for the specified datetime.'
         )
     else:
-        logging.error(f"Error with Graph request: {response.json()}")
+        azure_logger.error(f"Error with Graph request: {response.json()}")
         response.raise_for_status()
