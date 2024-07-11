@@ -7117,7 +7117,7 @@ components:
     installer:
       in: query
       name: installer
-      description: "Installation script. Default is <code>upgrade.sh</code> or <code>upgrade.bat</code> for windows
+      description: "Installation script. Default is <code>upgrade.sh</code> or <code>upgrade.ps1</code> for windows
       agents"
       schema:
         type: string

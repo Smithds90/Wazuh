@@ -304,7 +304,7 @@ STATIC int wm_agent_upgrade_send_wpk_to_agent(const wm_agent_task *agent_task, c
 
     if (!installer) {
         if (!strcmp(agent_task->agent_info->platform, "windows")) {
-            os_strdup("upgrade.bat", installer);
+            os_strdup("upgrade.ps1", installer);
         } else {
             os_strdup("upgrade.sh", installer);
         }

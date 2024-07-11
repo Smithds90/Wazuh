@@ -131,12 +131,12 @@ main() {
     # Compress and sign package
     if [ "${HAVE_PKG_NAME_WIN}" == true ]; then
         CURRENT_DIR=$(pwd)
-        echo "wpkpack ${OUTPUT} ${WPKCERT} ${WPKKEY} ${PKG_NAME} upgrade.bat do_upgrade.ps1"
+        echo "wpkpack ${OUTPUT} ${WPKCERT} ${WPKKEY} ${PKG_NAME} upgrade.ps1 do_upgrade.ps1"
         cd ${OUTDIR}
-        cp ${CURRENT_DIR}/src/win32/{upgrade.bat,do_upgrade.ps1} .
+        cp ${CURRENT_DIR}/src/win32/{upgrade.ps1,do_upgrade.ps1} .
         cp /var/pkg/${PKG_NAME} ${OUTDIR} 2>/dev/null
-        wpkpack ${OUTPUT} ${WPKCERT} ${WPKKEY} ${PKG_NAME} upgrade.bat do_upgrade.ps1
-        rm -f upgrade.bat do_upgrade.ps1 ${PKG_NAME}
+        wpkpack ${OUTPUT} ${WPKCERT} ${WPKKEY} ${PKG_NAME} upgrade.ps1 do_upgrade.ps1
+        rm -f upgrade.ps1 do_upgrade.ps1 ${PKG_NAME}
     elif [ "${HAVE_PKG_NAME_MAC}" == true ] || [ "${HAVE_PKG_NAME_LINUX}" == true ]; then
         CURRENT_DIR=$(pwd)
         echo "wpkpack ${OUTPUT} ${WPKCERT} ${WPKKEY} ${PKG_NAME} upgrade.sh pkg_installer.sh"

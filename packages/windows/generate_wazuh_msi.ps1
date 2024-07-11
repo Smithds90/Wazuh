@@ -69,7 +69,7 @@ function BuildWazuhMsi(){
         Write-Host "Signing .ps1 file..."
         & $SIGNTOOL_EXE sign /a /tr http://timestamp.digicert.com /fd SHA256 /td SHA256 "..\win32\do_upgrade.ps1"
         Write-Host "Signing .bat file..."
-        & $SIGNTOOL_EXE sign /a /tr http://timestamp.digicert.com /fd SHA256 /td SHA256 "..\win32\upgrade.bat"
+        & $SIGNTOOL_EXE sign /a /tr http://timestamp.digicert.com /fd SHA256 /td SHA256 "..\win32\upgrade.ps1"
     }
 
     Write-Host "Building MSI installer..."

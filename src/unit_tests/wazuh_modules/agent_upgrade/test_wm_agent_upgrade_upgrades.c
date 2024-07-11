@@ -1504,7 +1504,7 @@ void test_wm_agent_upgrade_send_wpk_to_agent_upgrade_windows_ok(void **state)
     char *write_file = "111 com write 5 test.wpk test\n";
     char *close_file = "111 com close test.wpk";
     char *calculate_sha1 = "111 com sha1 test.wpk";
-    char *run_upgrade = "111 com upgrade test.wpk upgrade.bat";
+    char *run_upgrade = "111 com upgrade test.wpk upgrade.ps1";
     char *agent_res_ok = "ok ";
     char *agent_res_ok_0 = "ok 0";
     char *agent_res_ok_sha1 = "ok d321af65983fa412e3a12c312ada12ab321a253a";
@@ -1644,7 +1644,7 @@ void test_wm_agent_upgrade_send_wpk_to_agent_upgrade_windows_ok(void **state)
     expect_string(__wrap__mtdebug2, formatted_msg, "(8166): Receiving message from agent: 'ok '");
     expect_string(__wrap__mtdebug2, formatted_msg, "(8165): Sending message to agent: '111 com sha1 test.wpk'");
     expect_string(__wrap__mtdebug2, formatted_msg, "(8166): Receiving message from agent: 'ok d321af65983fa412e3a12c312ada12ab321a253a'");
-    expect_string(__wrap__mtdebug2, formatted_msg, "(8165): Sending message to agent: '111 com upgrade test.wpk upgrade.bat'");
+    expect_string(__wrap__mtdebug2, formatted_msg, "(8165): Sending message to agent: '111 com upgrade test.wpk upgrade.ps1'");
     expect_string(__wrap__mtdebug2, formatted_msg, "(8166): Receiving message from agent: 'ok 0'");
 
     expect_string(__wrap_wm_agent_upgrade_parse_agent_response, agent_response, agent_res_ok);
