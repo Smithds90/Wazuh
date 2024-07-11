@@ -11,7 +11,7 @@ VALIDATION_TOKEN=${VALIDATION_TOKEN:-""}
 get_package_uninstallation_value() {
   local file_path="$1"
   local value=$(sed -n '/<anti_tampering>/,/<\/anti_tampering>/p' "$file_path" | grep -oP '(?<=<package_uninstallation>).*?(?=</package_uninstallation>)' | tr -d '\n')
-  return $value
+  echo "$value"
 }
 
 # Function to check anti-tampering configuration
@@ -30,15 +30,15 @@ check_anti_tampering() {
   fi
 
   if [ "$uninstall_validation_needed" = "yes" ]; then
-    return 1
-  else
     return 0
+  else
+    return 1
   fi
 }
 
 # Function to validate uninstallation
 validate_uninstall() {
-  local validation_command
+  local validation_command=0
 
   # Validate uninstallation
   if [ -n "$VALIDATION_TOKEN" ]; then
@@ -51,11 +51,11 @@ validate_uninstall() {
   fi
 
   $validation_command
-  if [ $? -eq 0 ]; then
+  if [ $? ]; then
+    echo "Uninstallation authorized, continuing..."
+  else
     echo "Uninstallation not authorized, aborting..."
     exit 1
-  else
-    echo "Uninstallation authorized, continuing..."
   fi
 }
 
@@ -121,7 +121,7 @@ case "$1" in
 
       # Check if anti-tampering is enabled
       if check_anti_tampering; then
-        validation_command
+        validate_uninstall
       fi
 
       # Stop the services before uninstalling the package

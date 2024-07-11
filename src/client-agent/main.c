@@ -12,11 +12,13 @@
 
 #include "shared.h"
 #include "agentd.h"
+#include <getopt.h>
 
 #ifndef ARGV0
 #define ARGV0 "wazuh-agentd"
 #endif
 
+#define AGENT_ID "001"
 
 /* Prototypes */
 static void help_agentd(char *home_path) __attribute((noreturn));
@@ -42,134 +44,70 @@ static void help_agentd(char *home_path)
     exit(1);
 }
 
-#include <curl/curl.h>
-#include <cjson/cJSON.h>
-#include <stdlib.h>
-#include <string.h>
+int check_uninstall_permission(const char *token) {
+    char url[OS_SIZE_8192];
+    snprintf(url, sizeof(url), "https://localhost:55000/agents/%s/uninstall_permission", AGENT_ID);
 
-#define API_URL "https://localhost:55000"
+    char header[OS_SIZE_8192] = { '\0' };
+    snprintf(header, sizeof(header), "Authorization: Bearer %s", token);
 
-#define BUFFER_SIZE 8192
+    char* headers[] = { NULL, NULL };
+    os_strdup(header, headers[0]);
 
-static char buffer[BUFFER_SIZE];
+    curl_response *response = wurl_http_request(WURL_GET_METHOD, headers, url, NULL, OS_SIZE_8192, 30);
 
-size_t write_callback(void *ptr, size_t size, size_t nmemb, void *stream) {
-    strncat(buffer, ptr, size * nmemb);
-    return size * nmemb;
-}
-
-/* Function to perform the token validation */
-int validate_token(const char *token) {
-    CURL *curl;
-    CURLcode res;
-    memset(buffer, 0, BUFFER_SIZE);
-
-    char url[256];
-    snprintf(url, sizeof(url), "%s/management_authorization", API_URL);
-
-    char auth_header[512];
-    snprintf(auth_header, sizeof(auth_header), "Authorization: Bearer %s", token);
-
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
-    if (curl) {
-        struct curl_slist *headers = NULL;
-        headers = curl_slist_append(headers, auth_header);
-        headers = curl_slist_append(headers, "Content-Type: application/json");
-
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "{\"action\":\"agent:uninstall\"}");
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-            curl_slist_free_all(headers);
-            curl_easy_cleanup(curl);
-            curl_global_cleanup();
+    if (response) {
+        if (response->status_code == 200) {
+            minfo("Permission granted: %s\n", response->body);
+            wurl_free_response(response);
+            os_free(headers[0]);
+            return 1;
+        } else if (response->status_code == 403) {
+            minfo("Permission denied: %s\n", response->body);
+            wurl_free_response(response);
+            os_free(headers[0]);
             return 0;
+        } else {
+            merror("Unexpected status code: %ld\n", response->status_code);
         }
-        curl_slist_free_all(headers);
-        curl_easy_cleanup(curl);
-    }
-    curl_global_cleanup();
-
-    cJSON *json = cJSON_Parse(buffer);
-    if (!json) {
-        fprintf(stderr, "Error parsing JSON\n");
-        return 0;
+        wurl_free_response(response);
+    } else {
+        merror("Failed to perform HTTP request\n");
     }
 
-    cJSON *authorized = cJSON_GetObjectItemCaseSensitive(json, "authorized");
-    int result = cJSON_IsTrue(authorized);
-
-    cJSON_Delete(json);
-    return result;
+    os_free(headers[0]);
+    return 2;
 }
 
-/* Function to authenticate and get the token */
-char* authenticate_user(const char *user, const char *password) {
-    CURL *curl;
-    CURLcode res;
-    memset(buffer, 0, BUFFER_SIZE);
+char* authenticate_and_get_token(const char *userpass) {
+    char url[OS_SIZE_8192];
+    char *token = NULL;
+    char* headers[] = { NULL };
 
-    char url[256];
-    snprintf(url, sizeof(url), "%s/security/user/authenticate?raw=true", API_URL);
+    snprintf(url, sizeof(url), "https://localhost:55000/security/user/authenticate?raw=true");
+    curl_response *response = wurl_http_request(WURL_POST_METHOD, headers, url, userpass, OS_SIZE_8192, 30);
 
-    curl_global_init(CURL_GLOBAL_DEFAULT);
-    curl = curl_easy_init();
-    if (curl) {
-        char userpwd[256];
-        snprintf(userpwd, sizeof(userpwd), "%s:%s", user, password);
-
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-        curl_easy_setopt(curl, CURLOPT_USERPWD, userpwd);
-        curl_easy_setopt(curl, CURLOPT_POST, 1L);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_callback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, buffer);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK) {
-            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
-            curl_easy_cleanup(curl);
-            curl_global_cleanup();
-            return NULL;
+    if (response) {
+        cJSON *response_json = NULL;
+        if (response_json = cJSON_Parse(response->body), response_json) {
+            cJSON *token_json = cJSON_GetObjectItem(response_json, "token");
+            if ((response->status_code == 200) && token_json && (token_json->type == cJSON_String)) {
+                os_strdup(token_json->valuestring, token);
+            } else {
+                merror("Error requesting token. Status code: %ld\n", response->status_code);
+            }
+            cJSON_Delete(response_json);
         }
-        curl_easy_cleanup(curl);
-    }
-    curl_global_cleanup();
-
-    cJSON *json = cJSON_Parse(buffer);
-    if (!json) {
-        fprintf(stderr, "Error parsing JSON\n");
-        return NULL;
+        wurl_free_response(response);
     }
 
-    cJSON *data = cJSON_GetObjectItemCaseSensitive(json, "data");
-    if (!cJSON_IsObject(data)) {
-        fprintf(stderr, "Error retrieving data object\n");
-        cJSON_Delete(json);
-        return NULL;
-    }
-
-    cJSON *token = cJSON_GetObjectItemCaseSensitive(data, "token");
-    if (!cJSON_IsString(token) || (token->valuestring == NULL)) {
-        fprintf(stderr, "Error retrieving token\n");
-        cJSON_Delete(json);
-        return NULL;
-    }
-
-    char *token_str = strdup(token->valuestring);
-    cJSON_Delete(json);
-    return token_str;
+    return token;
 }
 
 int main(int argc, char **argv)
 {
     int c = 0;
+    int validate_result = 2;
     int test_config = 0;
     int debug_level = 0;
     char *home_path = w_homedir(argv[0]);
@@ -264,26 +202,30 @@ int main(int argc, char **argv)
 
     /* Anti tampering functionality */
     if (uninstall_auth_token) {
-        if (validate_token(uninstall_auth_token)) {
-            exit(0);
-        } else {
-            exit(1);
+        validate_result = check_uninstall_permission(uninstall_auth_token);
+    }
+    if (validate_result == 2) {
+        if (uninstall_auth_login) {
+            char *new_token = authenticate_and_get_token(uninstall_auth_login);
+            if (new_token) {
+                validate_result = check_uninstall_permission(new_token);
+                os_free(new_token);
+            } else {
+                merror("Failed to authenticate with %s", uninstall_auth_login);
+            }
+            exit(validate_result);
         }
-    } else if (uninstall_auth_login) {
-        char *user = strtok(strdup(uninstall_auth_login), ":");
-        char *password = strtok(NULL, ":");
-        char *token = authenticate_user(user, password);
-        if (token && validate_token(token)) {
-            free(token);
-            exit(0);
-        } else {
-            free(token);
-            exit(1);
-        }
+    } else {
+        exit(validate_result);
     }
 
     agt = (agent *)calloc(1, sizeof(agent));
     if (!agt) {
+        merror_exit(MEM_ERROR, errno, strerror(errno));
+    }
+
+    atc = (anti_tampering *)calloc(1, sizeof(anti_tampering));
+    if (!atc) {
         merror_exit(MEM_ERROR, errno, strerror(errno));
     }
 
