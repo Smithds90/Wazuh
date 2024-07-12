@@ -12,11 +12,13 @@
 
 #include "shared.h"
 #include "agentd.h"
+#include <getopt.h>
 
 #ifndef ARGV0
 #define ARGV0 "wazuh-agentd"
 #endif
 
+#define AGENT_ID "001"
 
 /* Prototypes */
 static void help_agentd(char *home_path) __attribute((noreturn));
@@ -42,10 +44,70 @@ static void help_agentd(char *home_path)
     exit(1);
 }
 
+int check_uninstall_permission(const char *token) {
+    char url[OS_SIZE_8192];
+    snprintf(url, sizeof(url), "https://localhost:55000/agents/%s/uninstall_permission", AGENT_ID);
+
+    char header[OS_SIZE_8192] = { '\0' };
+    snprintf(header, sizeof(header), "Authorization: Bearer %s", token);
+
+    char* headers[] = { NULL, NULL };
+    os_strdup(header, headers[0]);
+
+    curl_response *response = wurl_http_request(WURL_GET_METHOD, headers, url, NULL, OS_SIZE_8192, 30);
+
+    if (response) {
+        if (response->status_code == 200) {
+            minfo("Permission granted: %s\n", response->body);
+            wurl_free_response(response);
+            os_free(headers[0]);
+            return 1;
+        } else if (response->status_code == 403) {
+            minfo("Permission denied: %s\n", response->body);
+            wurl_free_response(response);
+            os_free(headers[0]);
+            return 0;
+        } else {
+            merror("Unexpected status code: %ld\n", response->status_code);
+        }
+        wurl_free_response(response);
+    } else {
+        merror("Failed to perform HTTP request\n");
+    }
+
+    os_free(headers[0]);
+    return 2;
+}
+
+char* authenticate_and_get_token(const char *userpass) {
+    char url[OS_SIZE_8192];
+    char *token = NULL;
+    char* headers[] = { NULL };
+
+    snprintf(url, sizeof(url), "https://localhost:55000/security/user/authenticate?raw=true");
+    curl_response *response = wurl_http_request(WURL_POST_METHOD, headers, url, userpass, OS_SIZE_8192, 30);
+
+    if (response) {
+        cJSON *response_json = NULL;
+        if (response_json = cJSON_Parse(response->body), response_json) {
+            cJSON *token_json = cJSON_GetObjectItem(response_json, "token");
+            if ((response->status_code == 200) && token_json && (token_json->type == cJSON_String)) {
+                os_strdup(token_json->valuestring, token);
+            } else {
+                merror("Error requesting token. Status code: %ld\n", response->status_code);
+            }
+            cJSON_Delete(response_json);
+        }
+        wurl_free_response(response);
+    }
+
+    return token;
+}
 
 int main(int argc, char **argv)
 {
     int c = 0;
+    int validate_result = 2;
     int test_config = 0;
     int debug_level = 0;
     char *home_path = w_homedir(argv[0]);
@@ -53,6 +115,8 @@ int main(int argc, char **argv)
     const char *user = USER;
     const char *group = GROUPGLOBAL;
     const char *cfg = OSSECCONF;
+    const char *uninstall_auth_login = NULL;
+    const char *uninstall_auth_token = NULL;
 
     uid_t uid;
     gid_t gid;
@@ -71,7 +135,12 @@ int main(int argc, char **argv)
 
     agent_debug_level = getDefine_Int("agent", "debug", 0, 2);
 
-    while ((c = getopt(argc, argv, "Vtdfhu:g:D:c:")) != -1) {
+    struct option long_opts[] = {
+        {"uninstall-auth-login", 1, NULL, 1},
+        {"uninstall-auth-token", 1, NULL, 2}
+    };
+
+    while ((c = getopt_long(argc, argv, "Vtdfhu:g:D:c:", long_opts, NULL)) != -1) {
         switch (c) {
             case 'V':
                 print_version();
@@ -113,14 +182,50 @@ int main(int argc, char **argv)
                 }
                 cfg = optarg;
                 break;
+            case 1:
+                if (!optarg) {
+                    merror_exit("--uninstall-auth-login needs an argument");
+                }
+                uninstall_auth_login = optarg;
+                break;
+            case 2:
+                if (!optarg) {
+                    merror_exit("--uninstall-auth-token needs an argument");
+                }
+                uninstall_auth_token = optarg;
+                break;
             default:
                 help_agentd(home_path);
                 break;
         }
     }
 
+    /* Anti tampering functionality */
+    if (uninstall_auth_token) {
+        validate_result = check_uninstall_permission(uninstall_auth_token);
+    }
+    if (validate_result == 2) {
+        if (uninstall_auth_login) {
+            char *new_token = authenticate_and_get_token(uninstall_auth_login);
+            if (new_token) {
+                validate_result = check_uninstall_permission(new_token);
+                os_free(new_token);
+            } else {
+                merror("Failed to authenticate with %s", uninstall_auth_login);
+            }
+            exit(validate_result);
+        }
+    } else {
+        exit(validate_result);
+    }
+
     agt = (agent *)calloc(1, sizeof(agent));
     if (!agt) {
+        merror_exit(MEM_ERROR, errno, strerror(errno));
+    }
+
+    atc = (anti_tampering *)calloc(1, sizeof(anti_tampering));
+    if (!atc) {
         merror_exit(MEM_ERROR, errno, strerror(errno));
     }
 

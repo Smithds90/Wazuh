@@ -171,6 +171,7 @@ extern time_t last_connection_time;
 extern int run_foreground;
 extern keystore keys;
 extern agent *agt;
+extern anti_tampering *atc;
 
 static const char AG_IN_UNMERGE[] = "wazuh: Could not unmerge shared file.";
 
