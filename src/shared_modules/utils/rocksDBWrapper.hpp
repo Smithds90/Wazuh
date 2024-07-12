@@ -90,7 +90,9 @@ namespace Utils
                 std::vector<std::string> columnsNames;
                 if (const auto listStatus {T::ListColumnFamilies(options, m_path, &columnsNames)}; !listStatus.ok())
                 {
-                    throw std::runtime_error("Failed to list columns: " + std::string {listStatus.getState()});
+                    throw std::system_error(static_cast<int>(listStatus.code()),
+                                            std::system_category(),
+                                            "Failed to list columns: " + std::string {listStatus.getState()});
                 }
 
                 // Create a set of column descriptors. This includes the default column.
@@ -118,8 +120,10 @@ namespace Utils
                 if (const auto status {T::Open(options, m_path, columnsDescriptors, &columnHandles, &dbRawPtr)};
                     !status.ok())
                 {
-                    throw std::runtime_error("Failed to open RocksDB database. Reason: " +
-                                             std::string {status.getState()});
+                    throw std::system_error(static_cast<int>(status.code()),
+                                            std::system_category(),
+                                            "Failed to open RocksDB database. Reason: " +
+                                                std::string {status.getState()});
                 }
             }
             else
@@ -136,8 +140,8 @@ namespace Utils
                                              std::string {status.getState()});
                 }
             }
-            // Assigns the raw pointer to the unique_ptr. When db goes out of scope, it will automatically delete the
-            // allocated RocksDB instance.
+            // Assigns the raw pointer to the unique_ptr. When db goes out of scope, it will automatically delete
+            // the allocated RocksDB instance.
             m_db.reset(dbRawPtr);
 
             // Create a RAII wrapper for each column handle.
@@ -145,6 +149,93 @@ namespace Utils
             {
                 m_columnsInstances.emplace_back(m_db, handle);
             }
+        }
+
+        /**
+         * @brief This method tries to repair a RocksDB database and throws an exception if the process fails.
+         *
+         * @param dbPath The database path.
+         */
+        static void repairDB(const std::string& dbPath)
+        {
+            if constexpr (!std::is_same_v<T, rocksdb::DB>)
+            {
+                throw std::runtime_error("RepairDB is only supported for rocksdb::DB");
+            }
+
+            rocksdb::Options options;
+            if (const auto status {rocksdb::RepairDB(dbPath, options)}; !status.ok())
+            {
+                throw std::runtime_error("Failed to repair RocksDB database. Reason: " +
+                                         std::string {status.getState()});
+            }
+        }
+
+        /**
+         * @brief Tries to open a RocksDB database. If the database is corrupted, it tries to repair it. If the process
+         * fails or if the error is of another kind, it throws an exception.
+         *
+         * @param dbPath Database path.
+         * @param enableWal Constructor parameter to enable or disable WAL.
+         * @return A tuple containing the opened DB and a bool variable to indicate if it was required to repair it or
+         * not.
+         */
+        std::tuple<TRocksDBWrapper<rocksdb::DB>, bool> static openAndRepairBuilder(const std::string& dbPath,
+                                                                                   bool enableWal = true)
+        {
+            try
+            {
+                return std::tuple(TRocksDBWrapper<rocksdb::DB>(dbPath, enableWal), false);
+            }
+            catch (const std::system_error& e)
+            {
+                if (e.code().value() == rocksdb::Status::kIOError || e.code().value() == rocksdb::Status::kCorruption)
+                {
+                    TRocksDBWrapper<T>::repairDB(dbPath);
+                    try
+                    {
+                        return std::tuple(TRocksDBWrapper<rocksdb::DB>(dbPath, enableWal), true);
+                    }
+                    catch (const std::system_error& e)
+                    {
+                        throw std::runtime_error("Failed open on RocksDB database after repair. Code: " +
+                                                 std::to_string(e.code().value()) + ". Reason: " + e.what());
+                    }
+                    catch (const std::exception& e)
+                    {
+                        throw std::runtime_error("Failed open on RocksDB database after repair. Reason: " +
+                                                 std::string(e.what()));
+                    }
+                }
+                else
+                {
+                    throw std::runtime_error("Failed open on RocksDB database, repair not tried because the error "
+                                             "wasn't corruption. Code: " +
+                                             std::to_string(e.code().value()) + " Reason: " + e.what());
+                }
+            }
+            catch (const std::exception& e)
+            {
+                throw std::runtime_error("Failed open on RocksDB database, repair not tried because error code "
+                                         "wasn't available. Reason: " +
+                                         std::string(e.what()));
+            }
+        }
+
+        /**
+         * @brief Wrapper for openAndRepairBuilder() that returns a tuple with a unique pointer to the opened DB and a
+         * bool variable that indicates if it was required to repair the DB or not.
+         *
+         * @param dbPath Database path.
+         * @param enableWal Constructor parameter to enable or disable WAL.
+         * @return A tuple containing an unique_ptr to the opened DB and a bool variable to indicate if it was required
+         * to repair it or not.
+         */
+        std::tuple<std::unique_ptr<TRocksDBWrapper<rocksdb::DB>>, bool> static openAndRepairBuilderSp(
+            const std::string& dbPath, bool enableWal = true)
+        {
+            auto [db, repaired] = openAndRepairBuilder(dbPath, enableWal);
+            return {std::make_unique<TRocksDBWrapper<rocksdb::DB>>(std::move(db)), std::move(repaired)};
         }
 
         /**

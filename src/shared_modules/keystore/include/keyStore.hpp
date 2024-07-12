@@ -50,7 +50,11 @@ public:
         TRSAPrimitive().rsaEncrypt(CERTIFICATE_FILE, value, encryptedValue, true);
 
         // Insert to DB
-        Utils::RocksDBWrapper keystoreDB = Utils::RocksDBWrapper(DATABASE_PATH, false);
+        auto [keystoreDB, repaired] = Utils::RocksDBWrapper::openAndRepairBuilder(DATABASE_PATH, false);
+        if (repaired)
+        {
+            logWarn(KS_NAME, "Database '%s' was repaired because it was corrupt.", DATABASE_PATH);
+        }
 
         if (!keystoreDB.columnExists(columnFamily))
         {
@@ -72,7 +76,11 @@ public:
         std::string encryptedValue;
 
         // Get from DB
-        Utils::RocksDBWrapper keystoreDB = Utils::RocksDBWrapper(DATABASE_PATH, false);
+        auto [keystoreDB, repaired] = Utils::RocksDBWrapper::openAndRepairBuilder(DATABASE_PATH, false);
+        if (repaired)
+        {
+            logWarn(KS_NAME, "Database '%s' was repaired because it was corrupt.", DATABASE_PATH);
+        }
 
         if (!keystoreDB.columnExists(columnFamily))
         {

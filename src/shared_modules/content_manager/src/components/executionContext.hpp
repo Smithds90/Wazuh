@@ -117,7 +117,16 @@ private:
         }
 
         // Initialize RocksDB driver instance.
-        context.spRocksDB = std::make_unique<Utils::RocksDBWrapper>(databasePath + databaseName);
+        bool repaired {false};
+        std::tie(context.spRocksDB, repaired) =
+            Utils::RocksDBWrapper::openAndRepairBuilderSp(databasePath + databaseName);
+        if (repaired)
+        {
+            logWarn(WM_CONTENTUPDATER,
+                    "Database '%s%s' was repaired because it was corrupt.",
+                    databasePath.c_str(),
+                    databaseName.c_str());
+        }
 
         // Create database columns if necessary.
         const std::vector<std::string> COLUMNS {Components::Columns::CURRENT_OFFSET,
